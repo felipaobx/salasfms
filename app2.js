@@ -27,11 +27,11 @@ const elements = Object.fromEntries([
   'scheduleDrawer', 'drawerBackdrop', 'drawerTitle', 'drawerDate', 'drawerSubtitle', 'timeSlots',
   'reservationDialog', 'reservationForm', 'dialogKicker', 'dialogTitle', 'reservationId', 'reservationRoom',
   'reservationDate', 'reservationStart', 'reservationEnd', 'reservationName', 'reservationRa',
-  'reservationEmail', 'formError', 'deleteReservationButton', 'toast', 'sidebar', 'mobileMenu',
+  'reservationEmail', 'formError', 'deleteReservationButton', 'toast', 'sidebar', 'mobileMenu', 'currentUserAvatar', 'currentUserName', 'currentUserRole',
   'managementGrid', 'roomDialog', 'roomForm', 'roomDialogKicker', 'roomDialogTitle', 'roomId', 'roomName',
   'roomCapacity', 'roomStatus', 'roomFormError', 'deleteRoomButton', 'newReservationButton',
   'usersGrid', 'usersEmpty', 'userSearch', 'addUserButton', 'userDialog', 'userForm', 'userDialogKicker', 'userDialogTitle',
-  'userId', 'userName', 'userLogin', 'userRa', 'userFormError', 'deleteUserButton',
+  'userId', 'userName', 'userLogin', 'userRa', 'userPassword', 'userPasswordLabel', 'userPasswordHelp', 'userFormError', 'deleteUserButton',
   'slotDetailsDialog', 'slotDetailsKicker', 'slotDetailsTitle', 'slotDetailsBody', 'slotDetailsFooter', 'closeSlotDetails', 'dismissSlotDetails', 'editFromSlotDetails',
   'reservationDurationInfo', 'reservationDurationText',
 ].map(id => [id, document.getElementById(id)]));
@@ -510,24 +510,106 @@ function renderUsers() {
 }
 
 function openUserDialog(user = null) {
-  elements.userForm.reset(); elements.userFormError.hidden = true; elements.userId.value = user?.id || ''; elements.userName.value = user?.name || ''; elements.userLogin.value = user?.login || ''; elements.userRa.value = user?.ra || '';
-  elements.userDialogKicker.textContent = user ? 'Dados do usuário' : 'Novo usuário'; elements.userDialogTitle.textContent = user ? 'Editar usuário' : 'Adicionar usuário'; elements.deleteUserButton.hidden = !user; elements.userDialog.showModal();
+  elements.userForm.reset();
+  elements.userFormError.hidden = true;
+  elements.userId.value = user?.id || '';
+  elements.userName.value = user?.name || '';
+  elements.userLogin.value = user?.login || '';
+  elements.userRa.value = user?.ra || '';
+  elements.userPassword.value = '';
+
+  if (user) {
+    elements.userPasswordLabel.textContent = 'Nova senha (opcional)';
+    elements.userPassword.placeholder = 'Deixe em branco para manter a atual';
+    elements.userPassword.required = false;
+    elements.userPasswordHelp.hidden = false;
+    elements.userDialogKicker.textContent = 'Dados do usuário';
+    elements.userDialogTitle.textContent = 'Editar usuário';
+    elements.deleteUserButton.hidden = false;
+  } else {
+    elements.userPasswordLabel.textContent = 'Senha de acesso *';
+    elements.userPassword.placeholder = 'Digite a senha';
+    elements.userPassword.required = true;
+    elements.userPasswordHelp.hidden = true;
+    elements.userDialogKicker.textContent = 'Novo usuário';
+    elements.userDialogTitle.textContent = 'Adicionar usuário';
+    elements.deleteUserButton.hidden = true;
+  }
+
+  elements.userDialog.showModal();
   setTimeout(() => elements.userName.focus(), 50);
 }
 
 function saveUser(event) {
-  event.preventDefault(); const id = elements.userId.value; const name = elements.userName.value.trim(); const login = elements.userLogin.value.trim(); const ra = elements.userRa.value.trim();
+  event.preventDefault();
+  const id = elements.userId.value;
+  const name = elements.userName.value.trim();
+  const login = elements.userLogin.value.trim();
+  const ra = elements.userRa.value.trim();
+  const password = elements.userPassword.value.trim();
+
   if (!name || !login || !ra) return showFormError(elements.userFormError, 'Preencha nome completo, login e RA.');
+
+  const existingUser = state.users.find(user => user.id === id);
+  if (!id && !password) return showFormError(elements.userFormError, 'A senha é obrigatória para novos usuários.');
+  if (password && password.length < 3) return showFormError(elements.userFormError, 'A senha deve ter no mínimo 3 caracteres.');
+
   if (state.users.some(user => user.id !== id && user.login.toLocaleLowerCase('pt-BR') === login.toLocaleLowerCase('pt-BR'))) return showFormError(elements.userFormError, 'Este login já está cadastrado.');
   if (state.users.some(user => user.id !== id && user.ra.toLocaleLowerCase('pt-BR') === ra.toLocaleLowerCase('pt-BR'))) return showFormError(elements.userFormError, 'Este RA já está cadastrado.');
-  const data = { id: id || crypto.randomUUID(), name, login, ra };
-  const index = state.users.findIndex(user => user.id === id); if (index >= 0) state.users[index] = data; else state.users.push(data);
-  persistUsers(); elements.userDialog.close(); renderUsers(); showToast(index >= 0 ? 'Usuário atualizado com sucesso.' : 'Usuário cadastrado com sucesso.');
+
+  const userPassword = password || (existingUser ? existingUser.password : '123456');
+  const data = {
+    id: id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+    name,
+    login,
+    ra,
+    password: userPassword
+  };
+
+  const index = state.users.findIndex(user => user.id === id);
+  if (index >= 0) state.users[index] = data;
+  else state.users.push(data);
+
+  persistUsers();
+  elements.userDialog.close();
+  renderUsers();
+  showToast(index >= 0 ? 'Usuário atualizado com sucesso.' : 'Usuário cadastrado com sucesso.');
+
+  fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).catch(e => console.warn('Cloud sync error users:', e));
 }
 
 function deleteCurrentUser() {
-  const id = elements.userId.value; const user = state.users.find(item => item.id === id); if (!user || !window.confirm(`Remover o usuário ${user.name}?`)) return;
-  state.users = state.users.filter(item => item.id !== id); persistUsers(); elements.userDialog.close(); renderUsers(); showToast('Usuário removido com sucesso.');
+  const id = elements.userId.value;
+  const user = state.users.find(item => item.id === id);
+  if (!user || !window.confirm(`Remover o usuário ${user.name}?`)) return;
+
+  state.users = state.users.filter(item => item.id !== id);
+  persistUsers();
+  elements.userDialog.close();
+  renderUsers();
+  showToast('Usuário removido com sucesso.');
+
+  fetch(`/api/users?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(e => console.warn(e));
+}
+
+async function syncUsersFromServer() {
+  try {
+    const res = await fetch('/api/users');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ok && Array.isArray(json.data) && json.data.length > 0) {
+        state.users = json.data;
+        persistUsers();
+        renderUsers();
+      }
+    }
+  } catch (err) {
+    console.warn('Backend users sync offline, using local storage.');
+  }
 }
 
 async function syncReservationsFromServer() {
@@ -547,6 +629,17 @@ async function syncReservationsFromServer() {
   }
 }
 
+function updateCurrentUserDisplay() {
+  const storedName = sessionStorage.getItem('current_user_name') || 'Administrador';
+  const storedRole = sessionStorage.getItem('current_user_role') || 'Acesso geral';
+  if (elements.currentUserName) elements.currentUserName.textContent = storedName;
+  if (elements.currentUserRole) elements.currentUserRole.textContent = storedRole;
+  if (elements.currentUserAvatar) {
+    const initials = storedName.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || 'AD';
+    elements.currentUserAvatar.textContent = initials;
+  }
+}
+
 function showAccess() {
   elements.accessScreen.hidden = false;
   elements.adminApp.hidden = true;
@@ -556,16 +649,49 @@ function showAccess() {
 function showAdmin() {
   elements.accessScreen.hidden = true;
   elements.adminApp.hidden = false;
+  updateCurrentUserDisplay();
   switchView(state.activeView);
 }
 
 function login(event) {
   event.preventDefault();
-  if (elements.loginUser.value.trim() === 'admin' && elements.loginPassword.value === 'admin') { sessionStorage.setItem(AUTH_KEY, 'true'); elements.loginError.hidden = true; elements.loginForm.reset(); showAdmin(); return; }
+  const userInput = elements.loginUser.value.trim();
+  const passInput = elements.loginPassword.value;
+
+  if (userInput.toLowerCase() === 'admin' && passInput === 'admin') {
+    sessionStorage.setItem(AUTH_KEY, 'true');
+    sessionStorage.setItem('current_user_name', 'Administrador');
+    sessionStorage.setItem('current_user_role', 'Acesso geral');
+    elements.loginError.hidden = true;
+    elements.loginForm.reset();
+    showAdmin();
+    return;
+  }
+
+  const matched = state.users.find(u =>
+    u.login.trim().toLowerCase() === userInput.toLowerCase() &&
+    String(u.password) === passInput
+  );
+
+  if (matched) {
+    sessionStorage.setItem(AUTH_KEY, 'true');
+    sessionStorage.setItem('current_user_name', matched.name);
+    sessionStorage.setItem('current_user_role', `RA: ${matched.ra}`);
+    elements.loginError.hidden = true;
+    elements.loginForm.reset();
+    showAdmin();
+    return;
+  }
+
   showFormError(elements.loginError, 'Usuário ou senha incorretos.');
 }
 
-function logout() { sessionStorage.removeItem(AUTH_KEY); showAccess(); }
+function logout() {
+  sessionStorage.removeItem(AUTH_KEY);
+  sessionStorage.removeItem('current_user_name');
+  sessionStorage.removeItem('current_user_role');
+  showAccess();
+}
 
 function switchView(view) {
   state.activeView = view; const views = { dashboard: elements.dashboardView, reservations: elements.reservationsView, rooms: elements.roomsView, users: elements.usersView };
@@ -691,9 +817,11 @@ function init() {
   bindEvents();
   renderAll();
   setRoomLayout('grid');
+  updateCurrentUserDisplay();
   if (sessionStorage.getItem(AUTH_KEY) === 'true') showAdmin();
   else showAccess();
   syncReservationsFromServer();
+  syncUsersFromServer();
 }
 
 init();

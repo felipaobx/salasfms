@@ -61,8 +61,8 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="admin-avatar">AD</div>
-        <div><strong>Administrador</strong><small>Acesso geral</small></div>
+        <div class="admin-avatar" id="currentUserAvatar">AD</div>
+        <div><strong id="currentUserName">Administrador</strong><small id="currentUserRole">Acesso geral</small></div>
       </div>
     </aside>
 
@@ -283,6 +283,11 @@
         <input type="hidden" id="userId">
         <label><span>Nome completo</span><input id="userName" required maxlength="120" placeholder="Digite o nome completo"></label>
         <div class="form-grid two-columns"><label><span>Login</span><input id="userLogin" required maxlength="60" placeholder="Digite o login"></label><label><span>RA</span><input id="userRa" required maxlength="30" placeholder="Digite o RA"></label></div>
+        <label>
+          <span id="userPasswordLabel">Senha de acesso *</span>
+          <input id="userPassword" type="password" maxlength="60" placeholder="Digite a senha" autocomplete="new-password">
+          <small id="userPasswordHelp" style="color:var(--muted);font-size:.75rem;margin-top:.25rem;display:block;" hidden>Deixe em branco para manter a senha atual.</small>
+        </label>
         <p class="form-error" id="userFormError" hidden></p>
       </div>
       <footer class="dialog-footer"><button class="secondary-button danger-button" type="button" id="deleteUserButton" hidden>Remover usuário</button><span class="footer-spacer"></span><button class="secondary-button" value="cancel" formnovalidate>Voltar</button><button class="primary-button" type="submit">Salvar usuário</button></footer>

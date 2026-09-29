@@ -2,6 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const reservationsHandler = require('./api/reservations');
+const usersHandler = require('./api/users');
 
 const port = Number(process.env.PORT || 3000);
 const root = __dirname;
@@ -18,7 +19,8 @@ const contentTypes = {
 };
 
 const server = http.createServer((request, response) => {
-  if (request.url.startsWith('/api/reservations')) {
+  if (request.url.startsWith('/api/reservations') || request.url.startsWith('/api/users')) {
+    const handler = request.url.startsWith('/api/reservations') ? reservationsHandler : usersHandler;
     let body = '';
     request.on('data', chunk => { body += chunk; });
     request.on('end', async () => {
@@ -41,7 +43,7 @@ const server = http.createServer((request, response) => {
       };
 
       try {
-        await reservationsHandler(request, response);
+        await handler(request, response);
       } catch (err) {
         console.error('API Error:', err);
         response.status(500).json({ ok: false, error: 'Internal Server Error' });
