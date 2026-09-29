@@ -21,7 +21,7 @@ const state = {
 };
 
 const elements = Object.fromEntries([
-  'accessScreen', 'adminApp', 'studentPage', 'loginForm', 'loginUser', 'loginPassword', 'loginError',
+  'accessScreen', 'adminApp', 'loginForm', 'loginUser', 'loginPassword', 'loginError',
   'roomsGrid', 'roomsList', 'selectedDate', 'availableCount', 'occupiedCount', 'todayLabel', 'pageTitle',
   'dashboardView', 'reservationsView', 'roomsView', 'usersView', 'reservationSearch', 'reservationsCards', 'reservationsEmpty',
   'scheduleDrawer', 'drawerBackdrop', 'drawerTitle', 'drawerDate', 'drawerSubtitle', 'timeSlots',
@@ -29,14 +29,11 @@ const elements = Object.fromEntries([
   'reservationDate', 'reservationStart', 'reservationEnd', 'reservationName', 'reservationRa',
   'reservationEmail', 'formError', 'deleteReservationButton', 'toast', 'sidebar', 'mobileMenu',
   'managementGrid', 'roomDialog', 'roomForm', 'roomDialogKicker', 'roomDialogTitle', 'roomId', 'roomName',
-  'roomCapacity', 'roomStatus', 'roomFormError', 'deleteRoomButton', 'studentForm', 'studentName', 'studentRa',
-  'studentEmail', 'studentDate', 'studentRoomId', 'studentTime', 'studentDuration', 'studentRoomChoice', 'studentRoomHelp', 'durationControl', 'durationHelp',
-  'studentRules', 'studentError', 'studentRoomPicker', 'availabilityDialog', 'availabilityBody', 'newReservationButton',
+  'roomCapacity', 'roomStatus', 'roomFormError', 'deleteRoomButton', 'newReservationButton',
   'usersGrid', 'usersEmpty', 'userSearch', 'addUserButton', 'userDialog', 'userForm', 'userDialogKicker', 'userDialogTitle',
   'userId', 'userName', 'userLogin', 'userRa', 'userFormError', 'deleteUserButton',
   'slotDetailsDialog', 'slotDetailsKicker', 'slotDetailsTitle', 'slotDetailsBody', 'slotDetailsFooter', 'closeSlotDetails', 'dismissSlotDetails', 'editFromSlotDetails',
   'reservationDurationInfo', 'reservationDurationText',
-  'availabilitySearch', 'availabilityDateInfo', 'availabilityStatsInfo',
 ].map(id => [id, document.getElementById(id)]));
 
 function seedReservations() {
@@ -460,12 +457,20 @@ function saveReservation(event) {
   renderAll();
   if (elements.scheduleDrawer.classList.contains('open')) openDrawer(data.roomId);
   showToast(index >= 0 ? 'Reserva atualizada com sucesso.' : 'Reserva confirmada com sucesso.');
+
+  fetch('/api/reservations', {
+    method: index >= 0 ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).catch(e => console.warn('Cloud sync error:', e));
 }
 
 function deleteCurrentReservation() {
   const id = elements.reservationId.value; if (!id || !window.confirm('Deseja cancelar esta reserva?')) return;
   state.reservations = state.reservations.filter(item => item.id !== id); persistReservations(); elements.reservationDialog.close(); renderAll();
   if (elements.scheduleDrawer.classList.contains('open')) renderTimeSlots(); showToast('Reserva cancelada.');
+
+  fetch(`/api/reservations?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(e => console.warn(e));
 }
 
 function renderReservations() {
@@ -525,178 +530,34 @@ function deleteCurrentUser() {
   state.users = state.users.filter(item => item.id !== id); persistUsers(); elements.userDialog.close(); renderUsers(); showToast('Usuário removido com sucesso.');
 }
 
-function openAvailabilityDialog() {
-  const date = elements.studentDate.value;
-  if (!date) return showFormError(elements.studentError, 'Escolha uma data antes de consultar as salas.');
-  if (!isWeekday(date)) return showFormError(elements.studentError, 'Escolha uma data entre segunda e sexta-feira.');
-  elements.studentError.hidden = true;
-
-  if (elements.availabilitySearch) elements.availabilitySearch.value = '';
-  state.availabilityShift = 'all';
-  document.querySelectorAll('.avail-filter-pill').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.availShift === 'all');
-  });
-
-  renderAvailability();
-  elements.availabilityDialog.showModal();
-}
-
-function renderAvailability() {
-  const date = elements.studentDate.value;
-  if (!date) return;
-  const studentRa = elements.studentRa.value.trim();
-  const query = (elements.availabilitySearch?.value || '').trim().toLocaleLowerCase('pt-BR');
-  const shift = state.availabilityShift || 'all';
-
-  const shiftSlots = TIMES.filter(slot => {
-    const hour = Number(slot.slice(0, 2));
-    if (shift === 'morning') return hour >= 8 && hour < 12;
-    if (shift === 'afternoon') return hour >= 12 && hour < 17;
-    return true;
-  });
-
-  const activeRooms = state.rooms.filter(room => room.status === 'active');
-  const filteredRooms = activeRooms.filter(room => !query || room.name.toLocaleLowerCase('pt-BR').includes(query));
-
-  if (elements.availabilityDateInfo) {
-    elements.availabilityDateInfo.textContent = formatDate(date, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-  }
-  if (elements.availabilityStatsInfo) {
-    const shiftLabel = shift === 'morning' ? 'Manhã (08h–12h)' : shift === 'afternoon' ? 'Tarde (12h–17h)' : 'Todos os turnos';
-    elements.availabilityStatsInfo.textContent = `${filteredRooms.length} sala${filteredRooms.length === 1 ? '' : 's'} · ${shiftLabel}`;
-  }
-
-  if (filteredRooms.length === 0) {
-    elements.availabilityBody.innerHTML = `
-      <div class="avail-search-empty">
-        <div class="empty-icon">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-        </div>
-        <h3>Nenhuma sala encontrada</h3>
-        <p>Não encontramos nenhuma sala correspondente a "<strong>${escapeHtml(query)}</strong>".</p>
-        <button type="button" class="secondary-button" id="clearAvailSearch">Limpar busca</button>
-      </div>
-    `;
-    document.getElementById('clearAvailSearch')?.addEventListener('click', () => {
-      if (elements.availabilitySearch) elements.availabilitySearch.value = '';
-      renderAvailability();
-    });
-    return;
-  }
-
-  elements.availabilityBody.innerHTML = filteredRooms.map(room => {
-    const roomBookings = roomReservations(room.id, date);
-    const occupied = TIMES.filter(slot => roomBookings.some(item => reservationOverlapsSlot(item, slot)));
-    const usedHours = studentHoursOnRoom(studentRa, room.id, date);
-    const allFreeSlots = usedHours >= 2 ? [] : TIMES.filter(time => !occupied.includes(time));
-    const freeInShift = usedHours >= 2 ? [] : shiftSlots.filter(time => !occupied.includes(time));
-
-    const totalSlotsCount = shiftSlots.length;
-    const freeSlotsCount = freeInShift.length;
-    const percentFree = totalSlotsCount > 0 ? Math.round((freeSlotsCount / totalSlotsCount) * 100) : 0;
-    const capacityVal = getRoomCapacity(room);
-
-    let emptyMessage = 'Sem horários livres neste turno.';
-    if (usedHours >= 2) {
-      emptyMessage = 'Limite diário de 2h atingido para esta sala.';
-    } else if (allFreeSlots.length > 0 && freeInShift.length === 0) {
-      emptyMessage = 'Não há horários disponíveis no turno selecionado. Experimente outro turno.';
+async function syncReservationsFromServer() {
+  try {
+    const res = await fetch('/api/reservations');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ok && Array.isArray(json.data)) {
+        state.reservations = json.data;
+        persistReservations();
+        renderAll();
+        if (elements.scheduleDrawer.classList.contains('open')) renderTimeSlots();
+      }
     }
-
-    const slotsHtml = freeInShift.length ? `
-      <div class="avail-slots-grid">
-        ${freeInShift.map(time => {
-          const followingSlot = nextHour(time);
-          const canReserveTwo = usedHours === 0 && TIMES.includes(followingSlot) && !occupied.includes(followingSlot);
-          const endTime = nextHour(time);
-          return `
-            <button class="avail-slot-btn" type="button" data-student-room="${room.id}" data-student-time="${time}" data-can-two="${canReserveTwo}" aria-label="Reservar ${escapeHtml(room.name)} às ${time}">
-              <div class="slot-btn-top">
-                <span class="slot-btn-time">
-                  <svg viewBox="0 0 24 24"><path d="M12 8v4l2.5 2.5M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
-                  ${time} às ${endTime}
-                </span>
-                ${canReserveTwo ? '<span class="slot-btn-tag">Até 2h</span>' : '<span class="slot-btn-tag" style="background:#e0f2fe;color:#0369a1;">1h</span>'}
-              </div>
-              <div class="slot-btn-sub">
-                <span>Disponível</span>
-                <span class="slot-btn-action">Reservar →</span>
-              </div>
-            </button>
-          `;
-        }).join('')}
-      </div>
-    ` : `
-      <div class="avail-empty-room">
-        <svg viewBox="0 0 24 24" width="16" height="16" style="flex:none;color:#94a3b8;"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-        <span>${escapeHtml(emptyMessage)}</span>
-      </div>
-    `;
-
-    return `
-      <article class="avail-room-card">
-        <div class="avail-room-header">
-          <div class="avail-room-info-group">
-            <span class="avail-room-icon-box">${roomIcon()}</span>
-            <div>
-              <div class="avail-room-title-line">
-                <strong>${escapeHtml(room.name)}</strong>
-              </div>
-              <div class="avail-room-badges">
-                <span class="avail-badge">
-                  <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  Capacidade: ${capacityVal} pessoas
-                </span>
-                ${studentRa ? `
-                  <span class="avail-badge used-hours">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    ${usedHours}h de 2h utilizadas
-                  </span>
-                ` : ''}
-              </div>
-            </div>
-          </div>
-          <span class="avail-status-tag ${freeInShift.length > 0 ? 'available' : 'empty'}">
-            <i class="dot ${freeInShift.length > 0 ? 'green' : 'red'}"></i>
-            ${freeInShift.length > 0 ? `${freeInShift.length} horário${freeInShift.length === 1 ? '' : 's'} livre${freeInShift.length === 1 ? '' : 's'}` : 'Indisponível'}
-          </span>
-        </div>
-        <div class="avail-bar-wrap" title="${percentFree}% de horários livres">
-          <div class="avail-bar-fill" style="width: ${percentFree}%"></div>
-        </div>
-        ${slotsHtml}
-      </article>
-    `;
-  }).join('');
+  } catch (err) {
+    console.warn('Backend sync offline, using local storage.');
+  }
 }
 
-function chooseStudentSlot(roomId, time, canReserveTwo) {
-  elements.studentRoomId.value = roomId; elements.studentTime.value = time; elements.studentDuration.value = ''; elements.durationControl.hidden = false;
-  const twoHourButton = document.querySelector('[data-duration="2"]'); twoHourButton.disabled = !canReserveTwo;
-  document.querySelectorAll('[data-duration]').forEach(button => button.classList.remove('active'));
-  const room = roomById(roomId); elements.studentRoomChoice.textContent = `${room.name} · a partir das ${time}`;
-  elements.studentRoomHelp.textContent = 'Selecione obrigatoriamente a duração da reserva.';
-  elements.durationHelp.textContent = canReserveTwo ? 'Escolha 1 ou 2 horas.' : 'Somente 1 hora está disponível a partir deste horário.';
-  elements.availabilityDialog.close();
+function showAccess() {
+  elements.accessScreen.hidden = false;
+  elements.adminApp.hidden = true;
+  document.body.style.overflow = '';
 }
 
-function updateStudentDuration(duration) {
-  const room = roomById(elements.studentRoomId.value); const time = elements.studentTime.value; if (!room || !time) return;
-  elements.studentDuration.value = String(duration); document.querySelectorAll('[data-duration]').forEach(button => button.classList.toggle('active', Number(button.dataset.duration) === Number(duration)));
-  elements.studentRoomChoice.textContent = `${room.name} · ${time} às ${addHours(time, duration)}`;
-  elements.studentRoomHelp.textContent = `${formatDate(elements.studentDate.value, { day: '2-digit', month: 'long', year: 'numeric' })} · ${duration} hora${Number(duration) === 1 ? '' : 's'} · ${roomCapacityText(room).toLocaleLowerCase('pt-BR')}`;
+function showAdmin() {
+  elements.accessScreen.hidden = true;
+  elements.adminApp.hidden = false;
+  switchView(state.activeView);
 }
-
-function saveStudentReservation(event) {
-  event.preventDefault(); const duration = Number(elements.studentDuration.value); if (![1, 2].includes(duration)) return showFormError(elements.studentError, 'Escolha a duração da reserva: 1 hora ou 2 horas.'); const data = { id: crypto.randomUUID(), roomId: Number(elements.studentRoomId.value), date: elements.studentDate.value, start: elements.studentTime.value, end: elements.studentTime.value ? addHours(elements.studentTime.value, duration) : '', name: elements.studentName.value.trim(), ra: elements.studentRa.value.trim(), email: elements.studentEmail.value.trim(), origin: 'student' };
-  const error = validateReservation(data); if (error) return showFormError(elements.studentError, error); if (!elements.studentRules.checked) return showFormError(elements.studentError, 'Confirme que você leu e concorda com as regras.');
-  state.reservations.push(data); persistReservations(); elements.studentForm.reset(); elements.studentDate.value = state.selectedDate; resetStudentChoice(); renderAll(); showToast('Reserva confirmada! O horário já está registrado.');
-}
-
-function resetStudentChoice() { elements.studentRoomId.value = ''; elements.studentTime.value = ''; elements.studentDuration.value = ''; elements.durationControl.hidden = true; document.querySelectorAll('[data-duration]').forEach(button => button.classList.remove('active')); elements.studentRoomChoice.textContent = 'Escolher sala e horário'; elements.studentRoomHelp.textContent = 'Veja apenas os horários disponíveis'; }
-function showAccess() { elements.accessScreen.hidden = false; elements.studentPage.hidden = true; elements.adminApp.hidden = true; document.body.style.overflow = ''; }
-function showStudentPage() { elements.accessScreen.hidden = true; elements.adminApp.hidden = true; elements.studentPage.hidden = false; elements.studentDate.value = state.selectedDate; resetStudentChoice(); window.scrollTo(0, 0); }
-function showAdmin() { elements.accessScreen.hidden = true; elements.studentPage.hidden = true; elements.adminApp.hidden = false; switchView(state.activeView); }
 
 function login(event) {
   event.preventDefault();
@@ -725,7 +586,7 @@ function editIcon() { return '<svg viewBox="0 0 24 24"><path d="m14 5 5 5M4 20l3
 function renderAll() { renderRooms(); renderReservations(); renderManagement(); renderUsers(); }
 
 function bindEvents() {
-  elements.loginForm.addEventListener('submit', login); document.getElementById('openStudentPage').addEventListener('click', showStudentPage); document.getElementById('openStudentFromMenu').addEventListener('click', showStudentPage);
+  elements.loginForm.addEventListener('submit', login);
   document.getElementById('backToAccess')?.addEventListener('click', () => sessionStorage.getItem(AUTH_KEY) === 'true' ? showAdmin() : showAccess()); document.getElementById('logoutButton').addEventListener('click', logout);
   [elements.roomsGrid, elements.roomsList].forEach(container => container.addEventListener('click', event => { const card = event.target.closest('[data-room-id]'); if (card) openDrawer(card.dataset.roomId); }));
   document.getElementById('closeDrawer').addEventListener('click', closeDrawer); elements.drawerBackdrop.addEventListener('click', closeDrawer);
@@ -810,25 +671,29 @@ function bindEvents() {
   document.querySelectorAll('.nav-item[data-view]').forEach(button => button.addEventListener('click', () => switchView(button.dataset.view))); document.querySelectorAll('[data-layout]').forEach(button => button.addEventListener('click', () => setRoomLayout(button.dataset.layout)));
   elements.mobileMenu.addEventListener('click', () => { const open = elements.sidebar.classList.toggle('open'); elements.mobileMenu.setAttribute('aria-expanded', String(open)); });
   document.getElementById('addRoomButton').addEventListener('click', () => openRoomDialog()); elements.managementGrid.addEventListener('click', event => { const button = event.target.closest('[data-edit-room]'); if (button) openRoomDialog(roomById(button.dataset.editRoom)); });
-  elements.roomForm.addEventListener('submit', saveRoom); elements.deleteRoomButton.addEventListener('click', deleteCurrentRoom); elements.studentRoomPicker.addEventListener('click', openAvailabilityDialog); elements.studentDate.addEventListener('change', resetStudentChoice);
-  elements.availabilitySearch?.addEventListener('input', renderAvailability);
-  document.querySelectorAll('[data-avail-shift]').forEach(button => {
-    button.addEventListener('click', () => {
-      state.availabilityShift = button.dataset.availShift;
-      document.querySelectorAll('[data-avail-shift]').forEach(b => b.classList.toggle('active', b === button));
-      renderAvailability();
-    });
+  elements.roomForm.addEventListener('submit', saveRoom);
+  elements.deleteRoomButton.addEventListener('click', deleteCurrentRoom);
+  elements.addUserButton.addEventListener('click', () => openUserDialog());
+  elements.userSearch.addEventListener('input', renderUsers);
+  elements.usersGrid.addEventListener('click', event => {
+    const button = event.target.closest('[data-edit-user]');
+    if (button) openUserDialog(state.users.find(user => user.id === button.dataset.editUser));
   });
-  elements.addUserButton.addEventListener('click', () => openUserDialog()); elements.userSearch.addEventListener('input', renderUsers); elements.usersGrid.addEventListener('click', event => { const button = event.target.closest('[data-edit-user]'); if (button) openUserDialog(state.users.find(user => user.id === button.dataset.editUser)); }); elements.userForm.addEventListener('submit', saveUser); elements.deleteUserButton.addEventListener('click', deleteCurrentUser);
-  elements.availabilityBody.addEventListener('click', event => { const button = event.target.closest('[data-student-room]'); if (button) chooseStudentSlot(button.dataset.studentRoom, button.dataset.studentTime, button.dataset.canTwo === 'true'); });
-  document.querySelectorAll('[data-duration]').forEach(button => button.addEventListener('click', () => { if (!button.disabled) updateStudentDuration(Number(button.dataset.duration)); }));
-  document.getElementById('closeAvailability').addEventListener('click', () => elements.availabilityDialog.close()); elements.studentForm.addEventListener('submit', saveStudentReservation);
+  elements.userForm.addEventListener('submit', saveUser);
+  elements.deleteUserButton.addEventListener('click', deleteCurrentUser);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && elements.scheduleDrawer.classList.contains('open')) closeDrawer(); });
 }
 
 function init() {
-  elements.todayLabel.textContent = formatDate(toDateInput(new Date())); elements.selectedDate.value = state.selectedDate; elements.studentDate.min = toDateInput(new Date()); elements.studentDate.value = state.selectedDate;
-  fillRoomOptions(); bindEvents(); renderAll(); setRoomLayout('grid'); if (sessionStorage.getItem(AUTH_KEY) === 'true') showAdmin(); else showAccess();
+  elements.todayLabel.textContent = formatDate(toDateInput(new Date()));
+  elements.selectedDate.value = state.selectedDate;
+  fillRoomOptions();
+  bindEvents();
+  renderAll();
+  setRoomLayout('grid');
+  if (sessionStorage.getItem(AUTH_KEY) === 'true') showAdmin();
+  else showAccess();
+  syncReservationsFromServer();
 }
 
 init();

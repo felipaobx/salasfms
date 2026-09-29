@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal do Aluno · Reserva de Salas - Faculdade Medicina do Sertão</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/png" href="assets/fms-logo.png">
+</head>
+<body class="student-portal-body">
+  <header class="student-topbar">
+    <div class="access-brand student-brand">
+      <img class="fms-logo fms-logo-header" src="assets/fms-logo.png" alt="Faculdade Medicina do Sertão">
+      <span><strong>Reserva de Salas</strong><small>Portal do Aluno</small></span>
+    </div>
+    <a href="index.html" class="secondary-button" style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;">
+      <svg viewBox="0 0 24 24" width="14" height="14" style="stroke:currentColor;fill:none;stroke-width:2;"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+      Acesso Administrativo
+    </a>
+  </header>
+
+  <main class="student-content">
+    <div class="student-heading">
+      <span class="access-tag">Agendamento acadêmico</span>
+      <h1>Reserve uma sala</h1>
+      <p>Preencha seus dados, escolha a data e consulte os horários disponíveis em tempo real.</p>
+    </div>
+
+    <div class="student-layout">
+      <form class="student-form-card" id="studentForm" novalidate>
+        <div class="card-heading">
+          <span class="step-number">1</span>
+          <div>
+            <h2>Dados da reserva</h2>
+            <p>Informe seus dados acadêmicos.</p>
+          </div>
+        </div>
+
+        <label>
+          <span>Nome completo *</span>
+          <input id="studentName" required maxlength="120" placeholder="Digite seu nome completo">
+        </label>
+
+        <div class="form-grid two-columns">
+          <label>
+            <span>RA *</span>
+            <input id="studentRa" required maxlength="30" placeholder="Digite seu RA">
+          </label>
+          <label>
+            <span>E-mail</span>
+            <input id="studentEmail" type="email" required maxlength="140" placeholder="nome@instituicao.com.br">
+          </label>
+        </div>
+
+        <label>
+          <span>Data da reserva *</span>
+          <input id="studentDate" type="date" required>
+        </label>
+
+        <div class="student-room-field">
+          <span>Sala e horário *</span>
+          <button class="room-picker-button" id="studentRoomPicker" type="button">
+            <span class="room-picker-icon">
+              <svg viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M9 20v-5h6v5"/></svg>
+            </span>
+            <span>
+              <strong id="studentRoomChoice">Escolher sala e horário</strong>
+              <small id="studentRoomHelp">Veja apenas os horários disponíveis</small>
+            </span>
+            <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+
+          <div class="duration-control" id="durationControl" hidden>
+            <div>
+              <strong>Duração da reserva *</strong>
+              <small id="durationHelp">Escolha obrigatoriamente 1 ou 2 horas.</small>
+            </div>
+            <div class="duration-options" role="group" aria-label="Duração da reserva">
+              <button type="button" data-duration="1">1 hora</button>
+              <button type="button" data-duration="2">2 horas</button>
+            </div>
+          </div>
+        </div>
+
+        <input type="hidden" id="studentRoomId">
+        <input type="hidden" id="studentTime">
+        <input type="hidden" id="studentDuration" value="">
+
+        <label class="rules-accept">
+          <input type="checkbox" id="studentRules" required>
+          <span>Li e concordo com as regras de utilização das salas.</span>
+        </label>
+
+        <p class="form-error" id="studentError" hidden></p>
+        <button class="primary-button student-submit" type="submit" id="submitButton">Confirmar reserva</button>
+      </form>
+
+      <aside class="rules-card">
+        <div class="card-heading">
+          <span class="rules-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+          </span>
+          <div>
+            <h2>Regras de utilização</h2>
+            <p>Antes de reservar, leia atentamente.</p>
+          </div>
+        </div>
+        <ol class="rules-list">
+          <li>Reservas de segunda a sexta-feira, das 8h às 17h.</li>
+          <li>Cada aluno poderá reservar no máximo 2 horas por dia em cada sala.</li>
+          <li>Cada sala poderá ser reservada por apenas um aluno ou grupo por horário.</li>
+          <li>A reserva será válida somente após a confirmação no sistema.</li>
+          <li>Utilize a sala exclusivamente durante o período reservado.</li>
+          <li>Não ocupe uma sala sem realizar a reserva previamente.</li>
+          <li>Após 10 minutos de atraso, a reserva poderá ser cancelada automaticamente.</li>
+          <li>Mantenha o ambiente limpo, organizado e nas mesmas condições em que foi encontrado.</li>
+          <li>Preserve móveis, equipamentos e demais materiais disponíveis.</li>
+          <li>Não retire ou movimente itens e equipamentos para fora da sala.</li>
+          <li>Respeite a capacidade da sala e as normas de convivência da instituição.</li>
+          <li>Use a sala somente para finalidade acadêmica e institucional. Não é permitido comer ou dormir.</li>
+          <li>A instituição poderá cancelar, alterar ou bloquear reservas por necessidades operacionais.</li>
+        </ol>
+      </aside>
+    </div>
+  </main>
+
+  <dialog class="reservation-dialog availability-dialog" id="availabilityDialog">
+    <div class="dialog-header">
+      <div>
+        <span class="dialog-kicker">Disponibilidade em tempo real</span>
+        <h2>Escolha uma sala e horário</h2>
+        <p class="dialog-subtitle">Consulte os horários vagos e selecione o espaço para sua reserva</p>
+      </div>
+      <button class="icon-button" id="closeAvailability" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="availability-toolbar">
+      <div class="availability-search-box">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input type="search" id="availabilitySearch" placeholder="Buscar sala por nome...">
+      </div>
+      <div class="availability-shift-filters" role="group" aria-label="Filtrar turnos">
+        <button type="button" class="avail-filter-pill active" data-avail-shift="all">Todos os turnos</button>
+        <button type="button" class="avail-filter-pill" data-avail-shift="morning">🌅 Manhã (08h–12h)</button>
+        <button type="button" class="avail-filter-pill" data-avail-shift="afternoon">☀️ Tarde (12h–17h)</button>
+      </div>
+    </div>
+    <div class="availability-meta-bar" id="availabilityMetaBar">
+      <span id="availabilityDateInfo">Quinta-feira, 29 de setembro</span>
+      <span id="availabilityStatsInfo">13 salas disponíveis</span>
+    </div>
+    <div class="availability-body" id="availabilityBody"></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="ensalamento-data.js"></script>
+  <script src="aluno.js"></script>
+</body>
+</html>
