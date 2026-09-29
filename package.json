@@ -5,6 +5,6 @@
   "description": "Painel administrativo para agendamento de salas de aula",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check app.js && node --check server.js"
+    "check": "node --check app2.js && node --check server.js"
   }
 }
