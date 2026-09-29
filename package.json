@@ -1,10 +1,10 @@
 {
-  "name": "sistema-de-monitoria-salas",
+  "name": "salasfms",
   "version": "1.0.0",
   "private": true,
-  "description": "Painel administrativo para agendamento de salas de aula",
+  "description": "Painel para agendamento de salas de aula - Faculdade Medicina do Sertao",
   "scripts": {
-    "start": "node server.js",
-    "check": "node --check app2.js && node --check server.js"
+    "start": "node local-server.js",
+    "check": "node --check app2.js; node --check local-server.js"
   }
 }
