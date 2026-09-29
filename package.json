@@ -5,6 +5,7 @@
   "description": "Painel para agendamento de salas de aula - Faculdade Medicina do Sertao",
   "scripts": {
     "start": "node local-server.js",
+    "build": "node -e \"console.log('Build complete')\"",
     "check": "node --check app2.js; node --check local-server.js"
   }
 }
