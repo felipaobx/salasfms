@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Painel administrativo para agendamento e acompanhamento das salas de aula.">
+  <title>Gestão de Salas</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Cpath d='M15 19h34v26H15z' fill='white'/%3E%3Cpath d='M22 14v10M42 14v10M15 28h34' stroke='%230f172a' stroke-width='4'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 5.75A1.75 1.75 0 0 1 5.75 4h12.5A1.75 1.75 0 0 1 20 5.75v12.5A1.75 1.75 0 0 1 18.25 20H5.75A1.75 1.75 0 0 1 4 18.25V5.75Z"/><path d="M8 2v4M16 2v4M4 9h16M8 13h3M13 13h3M8 16h3"/></svg>
+        </span>
+        <span><strong>Gestão de Salas</strong><small>Painel administrativo</small></span>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Navegação principal">
+        <button class="nav-item active" type="button" data-view="dashboard">
+          <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+          Visão geral
+        </button>
+        <button class="nav-item" type="button" data-view="reservations">
+          <svg viewBox="0 0 24 24"><path d="M6 3v3M18 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/><path d="m8 14 2.2 2.2L16 11"/></svg>
+          Reservas
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="admin-avatar">AD</div>
+        <div><strong>Administrador</strong><small>Acesso geral</small></div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobileMenu" aria-label="Abrir menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <div class="topbar-copy">
+          <p id="todayLabel"></p>
+          <h1 id="pageTitle">Visão geral das salas</h1>
+        </div>
+        <button class="primary-button" id="newReservationButton" type="button">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Nova reserva
+        </button>
+      </header>
+
+      <section id="dashboardView" class="view active" aria-labelledby="pageTitle">
+        <div class="filters-panel">
+          <label class="date-control">
+            <span>Data da consulta</span>
+            <input type="date" id="selectedDate">
+          </label>
+          <div class="status-summary" aria-label="Resumo de disponibilidade">
+            <div><span class="summary-icon available"><svg viewBox="0 0 24 24"><path d="m7 12 3 3 7-7"/></svg></span><span><strong id="availableCount">0</strong><small>salas disponíveis</small></span></div>
+            <div><span class="summary-icon occupied"><svg viewBox="0 0 24 24"><path d="M12 8v4l2.5 2.5M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg></span><span><strong id="occupiedCount">0</strong><small>com reservas</small></span></div>
+            <div><span class="summary-icon total"><svg viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M9 20v-5h6v5M8 9h1M15 9h1M8 12h1M15 12h1"/></svg></span><span><strong>13</strong><small>salas no total</small></span></div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <div><h2>Salas de aula</h2><p>Selecione uma sala para consultar os horários do dia.</p></div>
+          <div class="legend"><span><i class="dot green"></i>Disponível agora</span><span><i class="dot red"></i>Em uso agora</span></div>
+        </div>
+        <div class="rooms-grid" id="roomsGrid"></div>
+      </section>
+
+      <section id="reservationsView" class="view" aria-labelledby="reservationsHeading">
+        <div class="reservations-header">
+          <div><h2 id="reservationsHeading">Todas as reservas</h2><p>Acompanhe e gerencie os agendamentos cadastrados.</p></div>
+          <label class="search-control">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <input type="search" id="reservationSearch" placeholder="Buscar por sala, nome, RA ou e-mail">
+          </label>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Data</th><th>Sala</th><th>Horário</th><th>Responsável</th><th>RA</th><th>E-mail</th><th></th></tr></thead>
+              <tbody id="reservationsTableBody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="reservationsEmpty" hidden>
+            <span><svg viewBox="0 0 24 24"><path d="M6 3v3M18 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg></span>
+            <h3>Nenhuma reserva encontrada</h3><p>Cadastre um novo agendamento ou altere sua busca.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="schedule-drawer" id="scheduleDrawer" aria-hidden="true" aria-labelledby="drawerTitle">
+    <header class="drawer-header">
+      <div>
+        <span class="drawer-eyebrow" id="drawerDate"></span>
+        <h2 id="drawerTitle">Sala</h2>
+        <p id="drawerSubtitle"></p>
+      </div>
+      <button class="icon-button" id="closeDrawer" aria-label="Fechar horários"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="drawer-body">
+      <div class="drawer-legend"><span><i class="dot green"></i>Livre</span><span><i class="dot red"></i>Reservado</span></div>
+      <div class="time-slots" id="timeSlots"></div>
+    </div>
+  </aside>
+
+  <dialog class="reservation-dialog" id="reservationDialog">
+    <form method="dialog" id="reservationForm" novalidate>
+      <header class="dialog-header">
+        <div><span class="dialog-kicker" id="dialogKicker">Novo agendamento</span><h2 id="dialogTitle">Reservar sala</h2></div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </header>
+      <div class="dialog-body">
+        <input type="hidden" id="reservationId">
+        <div class="form-grid two-columns">
+          <label><span>Sala</span><select id="reservationRoom" required></select></label>
+          <label><span>Data</span><input type="date" id="reservationDate" required></label>
+        </div>
+        <div class="form-grid two-columns">
+          <label><span>Horário inicial</span><select id="reservationStart" required></select></label>
+          <label><span>Horário final</span><input id="reservationEnd" readonly aria-label="Horário final"></label>
+        </div>
+        <label><span>Nome completo</span><input type="text" id="reservationName" placeholder="Ex.: Amanda Karla Marques de Sousa" required maxlength="120"></label>
+        <div class="form-grid two-columns">
+          <label><span>RA</span><input type="text" id="reservationRa" placeholder="Ex.: 14000071" required maxlength="30"></label>
+          <label><span>E-mail</span><input type="email" id="reservationEmail" placeholder="nome@instituicao.com.br" required maxlength="140"></label>
+        </div>
+        <p class="form-error" id="formError" role="alert" hidden></p>
+      </div>
+      <footer class="dialog-footer">
+        <button class="secondary-button danger-button" type="button" id="deleteReservationButton" hidden>Cancelar reserva</button>
+        <span class="footer-spacer"></span>
+        <button class="secondary-button" value="cancel" formnovalidate>Voltar</button>
+        <button class="primary-button" type="submit" id="saveReservationButton">Confirmar reserva</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
