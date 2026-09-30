@@ -1,14 +1,14 @@
-const FALLBACK_ROOMS = Array.from({ length: 13 }, (_, index) => ({
+const FALLBACK_ROOMS = Array.from({ length: 14 }, (_, index) => ({
   id: index + 1,
-  name: `Sala ${index + 1}`,
-  capacity: index < 4 ? 40 : index < 9 ? 30 : 25,
+  name: `Tutoria ${index + 1}`,
+  capacity: 16,
   status: 'active',
 }));
 const ROOMS = Array.isArray(window.ENSALAMENTO_ROOMS) && window.ENSALAMENTO_ROOMS.length ? window.ENSALAMENTO_ROOMS : FALLBACK_ROOMS;
 const INSTITUTIONAL_RESERVATIONS = Array.isArray(window.ENSALAMENTO_RESERVATIONS) ? window.ENSALAMENTO_RESERVATIONS : [];
 
 const TIMES = Array.from({ length: 9 }, (_, index) => `${String(index + 8).padStart(2, '0')}:00`);
-const RESERVATIONS_KEY = 'gestao-salas-reservas-v3';
+const RESERVATIONS_KEY = 'gestao-salas-reservas-v4';
 
 const state = {
   rooms: ROOMS,

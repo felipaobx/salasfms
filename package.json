@@ -9,6 +9,7 @@
     "check": "node --check app2.js && node --check aluno.js && node --check local-server.js && node --check api/reservations.js && node --check api/users.js"
   },
   "dependencies": {
-    "@vercel/blob": "^2.8.0"
+    "@vercel/blob": "^2.8.0",
+    "xlsx": "^0.18.5"
   }
 }
