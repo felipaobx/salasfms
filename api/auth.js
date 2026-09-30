@@ -23,7 +23,7 @@ async function readUsers() {
 
 async function writeUsers(users) {
   if (process.env.BLOB_READ_WRITE_TOKEN) {
-    await put(BLOB_PATH, JSON.stringify(users, null, 2), { access: 'public', addRandomSuffix: false, contentType: 'application/json' });
+    await put(BLOB_PATH, JSON.stringify(users, null, 2), { access: 'public', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json' });
     return;
   }
   const directory = path.dirname(LOCAL_PATH);

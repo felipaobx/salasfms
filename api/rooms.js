@@ -51,7 +51,7 @@ async function readRooms() {
 async function writeRooms(rooms) {
   try {
     if (process.env.BLOB_READ_WRITE_TOKEN) {
-      await put(BLOB_PATH, JSON.stringify(rooms, null, 2), { access: 'public', addRandomSuffix: false, contentType: 'application/json' });
+      await put(BLOB_PATH, JSON.stringify(rooms, null, 2), { access: 'public', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json' });
       return true;
     }
     const directory = path.dirname(LOCAL_PATH);

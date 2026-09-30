@@ -41,6 +41,7 @@ async function writeToStorage(data) {
       await put(BLOB_PATH, JSON.stringify(data, null, 2), {
         access: 'public',
         addRandomSuffix: false,
+        allowOverwrite: true,
         contentType: 'application/json',
       });
       return true;
