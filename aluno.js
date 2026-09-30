@@ -74,6 +74,16 @@ async function syncReservationsFromServer() {
   }
 }
 
+async function syncRoomsFromServer() {
+  try {
+    const res = await fetch('/api/rooms', { cache: 'no-store' });
+    const json = await res.json();
+    if (res.ok && json.ok && Array.isArray(json.data) && json.data.length) state.rooms = json.data;
+  } catch (err) {
+    console.warn('Sincronização de salas indisponível; usando a lista publicada.');
+  }
+}
+
 function toDateInput(date) {
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
@@ -183,11 +193,13 @@ function showToast(message) {
   showToast.timer = setTimeout(() => elements.toast.classList.remove('show'), 3500);
 }
 
-function openAvailabilityDialog() {
+async function openAvailabilityDialog() {
   const date = elements.studentDate.value;
   if (!date) return showFormError(elements.studentError, 'Escolha uma data antes de consultar as salas.');
   if (!isWeekday(date)) return showFormError(elements.studentError, 'Escolha uma data entre segunda e sexta-feira.');
   elements.studentError.hidden = true;
+
+  await Promise.all([syncRoomsFromServer(), syncReservationsFromServer()]);
 
   if (elements.availabilitySearch) elements.availabilitySearch.value = '';
   state.availabilityShift = 'all';
@@ -424,12 +436,7 @@ async function saveStudentReservation(event) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (err) {
     console.error('Reservation submission error:', err);
-    state.userReservations.push(reservationData);
-    persistLocalReservations(state.userReservations);
-    showToast('Reserva registrada localmente.');
-    elements.studentForm.reset();
-    elements.studentDate.value = state.selectedDate;
-    resetStudentChoice();
+    showFormError(elements.studentError, 'Não foi possível confirmar no banco online. Verifique sua conexão e tente novamente.');
   } finally {
     elements.submitButton.disabled = false;
     elements.submitButton.textContent = 'Confirmar reserva';
@@ -483,7 +490,7 @@ async function init() {
   state.selectedDate = today;
 
   bindEvents();
-  await syncReservationsFromServer();
+  await Promise.all([syncRoomsFromServer(), syncReservationsFromServer()]);
 }
 
 init();

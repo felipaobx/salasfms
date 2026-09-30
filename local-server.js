@@ -3,6 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const reservationsHandler = require('./api/reservations');
 const usersHandler = require('./api/users');
+const authHandler = require('./api/auth');
+const roomsHandler = require('./api/rooms');
+const qrHandler = require('./api/qr');
 
 const port = Number(process.env.PORT || 3000);
 const root = __dirname;
@@ -19,8 +22,16 @@ const contentTypes = {
 };
 
 const server = http.createServer((request, response) => {
-  if (request.url.startsWith('/api/reservations') || request.url.startsWith('/api/users')) {
-    const handler = request.url.startsWith('/api/reservations') ? reservationsHandler : usersHandler;
+  const apiRoute = [
+    ['/api/reservations', reservationsHandler],
+    ['/api/users', usersHandler],
+    ['/api/auth', authHandler],
+    ['/api/rooms', roomsHandler],
+    ['/api/qr', qrHandler],
+  ].find(([route]) => request.url.startsWith(route));
+
+  if (apiRoute) {
+    const handler = apiRoute[1];
     let body = '';
     request.on('data', chunk => { body += chunk; });
     request.on('end', async () => {
@@ -52,7 +63,8 @@ const server = http.createServer((request, response) => {
     return;
   }
 
-  const requestPath = request.url === '/' ? '/index.html' : request.url.split('?')[0];
+  const rawRequestPath = request.url === '/' ? '/index.html' : request.url.split('?')[0];
+  const requestPath = rawRequestPath === '/aluno' ? '/aluno.html' : rawRequestPath;
   const safePath = path.normalize(requestPath).replace(/^(\.\.[/\\])+/, '');
   const filePath = path.join(root, safePath);
 

@@ -6,10 +6,11 @@
   "scripts": {
     "start": "node local-server.js",
     "build": "node -e \"const fs = require('fs'); if (!fs.existsSync('dist')) fs.mkdirSync('dist'); ['index.html','aluno.html','styles.css','app2.js','aluno.js','ensalamento-data.js'].forEach(f => fs.copyFileSync(f, 'dist/' + f)); fs.cpSync('assets', 'dist/assets', { recursive: true }); console.log('Build complete');\"",
-    "check": "node --check app2.js && node --check aluno.js && node --check local-server.js && node --check api/reservations.js && node --check api/users.js"
+    "check": "node --check app2.js && node --check aluno.js && node --check local-server.js && node --check api/_auth.js && node --check api/_password.js && node --check api/reservations.js && node --check api/users.js && node --check api/auth.js && node --check api/rooms.js && node --check api/qr.js"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
+    "qrcode": "^1.5.4",
     "xlsx": "^0.18.5"
   }
 }

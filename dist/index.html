@@ -96,6 +96,26 @@
           </div>
         </div>
 
+        <section class="student-access-panel" aria-labelledby="studentAccessTitle">
+          <div class="student-access-copy">
+            <span class="dialog-kicker">Acesso rápido</span>
+            <h2 id="studentAccessTitle">QR Code do Portal do Aluno</h2>
+            <p>Mostre este código em uma tela ou imprima para os alunos consultarem horários e fazerem reservas pelo celular.</p>
+            <div class="student-portal-address">
+              <input id="studentPortalUrl" type="text" readonly aria-label="Endereço do Portal do Aluno">
+              <button class="secondary-button" id="copyStudentPortal" type="button">Copiar link</button>
+            </div>
+            <div class="student-access-actions">
+              <a class="primary-button" href="/aluno" target="_blank" rel="noopener">Abrir Portal do Aluno ↗</a>
+              <a class="secondary-button" href="/api/qr?download=1" download="qr-portal-aluno.svg">Baixar QR Code</a>
+            </div>
+          </div>
+          <div class="student-qr-card">
+            <img id="studentQrCode" src="/api/qr" alt="QR Code para acessar o Portal do Aluno">
+            <small>Aponte a câmera do celular</small>
+          </div>
+        </section>
+
         <div class="section-heading">
           <div><h2>Salas de aula</h2><p>Selecione uma sala para consultar os horários do dia.</p></div>
           <div class="heading-actions"><div class="legend"><span><i class="dot green"></i>Disponível agora</span><span><i class="dot red"></i>Em uso agora</span></div><div class="view-switch" aria-label="Formato de exibição"><button class="active" type="button" data-layout="grid" aria-label="Exibir cards"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></button><button type="button" data-layout="list" aria-label="Exibir lista"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg></button></div></div>

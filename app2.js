@@ -33,7 +33,7 @@ const elements = Object.fromEntries([
   'usersGrid', 'usersEmpty', 'userSearch', 'addUserButton', 'userDialog', 'userForm', 'userDialogKicker', 'userDialogTitle',
   'userId', 'userName', 'userLogin', 'userRa', 'userPassword', 'userPasswordLabel', 'userPasswordHelp', 'userFormError', 'deleteUserButton',
   'slotDetailsDialog', 'slotDetailsKicker', 'slotDetailsTitle', 'slotDetailsBody', 'slotDetailsFooter', 'closeSlotDetails', 'dismissSlotDetails', 'editFromSlotDetails',
-  'reservationDurationInfo', 'reservationDurationText',
+  'reservationDurationInfo', 'reservationDurationText', 'studentPortalUrl', 'copyStudentPortal', 'studentQrCode',
 ].map(id => [id, document.getElementById(id)]));
 
 function seedReservations() {
@@ -63,6 +63,33 @@ function loadUsers() {
 function persistRooms() { localStorage.setItem(ROOMS_KEY, JSON.stringify(state.rooms)); }
 function persistReservations() { localStorage.setItem(RESERVATIONS_KEY, JSON.stringify(state.reservations)); }
 function persistUsers() { localStorage.setItem(USERS_KEY, JSON.stringify(state.users)); }
+
+async function saveRoomsToServer(rooms = state.rooms) {
+  const response = await fetch('/api/rooms', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rooms }),
+  });
+  const json = await response.json().catch(() => ({}));
+  if (response.status === 401) throw new Error('Sua sessão expirou. Entre novamente para salvar.');
+  if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível salvar as salas no banco online.');
+  return json.data;
+}
+
+async function syncRoomsFromServer() {
+  try {
+    const response = await fetch('/api/rooms', { cache: 'no-store' });
+    const json = await response.json();
+    if (!response.ok || !json.ok || !Array.isArray(json.data)) return;
+    if (json.configured) state.rooms = json.data;
+    else if (sessionStorage.getItem(AUTH_KEY) === 'true') state.rooms = await saveRoomsToServer(state.rooms);
+    persistRooms();
+    fillRoomOptions();
+    renderAll();
+  } catch (error) {
+    console.warn('Sincronização de salas indisponível:', error);
+  }
+}
 function toDateInput(date) { const offset = date.getTimezoneOffset(); return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10); }
 function formatDate(dateString, options = { weekday: 'long', day: '2-digit', month: 'long' }) { return new Intl.DateTimeFormat('pt-BR', options).format(new Date(`${dateString}T12:00:00`)); }
 function formatShortDate(dateString) { return new Intl.DateTimeFormat('pt-BR').format(new Date(`${dateString}T12:00:00`)); }
@@ -432,7 +459,7 @@ function validateReservation(data) {
   return '';
 }
 
-function saveReservation(event) {
+async function saveReservation(event) {
   event.preventDefault();
   const data = {
     id: elements.reservationId.value || crypto.randomUUID(),
@@ -448,29 +475,46 @@ function saveReservation(event) {
   const error = validateReservation(data);
   if (error) return showFormError(elements.formError, error);
   const index = state.reservations.findIndex(item => item.id === data.id);
-  if (index >= 0) state.reservations[index] = { ...state.reservations[index], ...data };
-  else state.reservations.push(data);
-  persistReservations();
-  elements.reservationDialog.close();
-  state.selectedDate = data.date;
-  elements.selectedDate.value = data.date;
-  renderAll();
-  if (elements.scheduleDrawer.classList.contains('open')) openDrawer(data.roomId);
-  showToast(index >= 0 ? 'Reserva atualizada com sucesso.' : 'Reserva confirmada com sucesso.');
-
-  fetch('/api/reservations', {
-    method: index >= 0 ? 'PUT' : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).catch(e => console.warn('Cloud sync error:', e));
+  const submitButton = elements.reservationForm.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    const response = await fetch('/api/reservations', {
+      method: index >= 0 ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível salvar a reserva no banco online.');
+    const saved = json.data || data;
+    if (index >= 0) state.reservations[index] = saved;
+    else state.reservations.push(saved);
+    persistReservations();
+    elements.reservationDialog.close();
+    state.selectedDate = saved.date;
+    elements.selectedDate.value = saved.date;
+    renderAll();
+    if (elements.scheduleDrawer.classList.contains('open')) openDrawer(saved.roomId);
+    showToast(index >= 0 ? 'Reserva atualizada e sincronizada.' : 'Reserva confirmada e sincronizada.');
+  } catch (error) {
+    showFormError(elements.formError, error.message);
+  } finally {
+    submitButton.disabled = false;
+  }
 }
 
-function deleteCurrentReservation() {
+async function deleteCurrentReservation() {
   const id = elements.reservationId.value; if (!id || !window.confirm('Deseja cancelar esta reserva?')) return;
-  state.reservations = state.reservations.filter(item => item.id !== id); persistReservations(); elements.reservationDialog.close(); renderAll();
-  if (elements.scheduleDrawer.classList.contains('open')) renderTimeSlots(); showToast('Reserva cancelada.');
-
-  fetch(`/api/reservations?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(e => console.warn(e));
+  try {
+    const response = await fetch(`/api/reservations?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível cancelar a reserva online.');
+    state.reservations = state.reservations.filter(item => item.id !== id);
+    persistReservations(); elements.reservationDialog.close(); renderAll();
+    if (elements.scheduleDrawer.classList.contains('open')) renderTimeSlots();
+    showToast('Reserva cancelada e sincronizada.');
+  } catch (error) {
+    showFormError(elements.formError, error.message);
+  }
 }
 
 function renderReservations() {
@@ -488,18 +532,42 @@ function openRoomDialog(room = null) {
   elements.roomDialogKicker.textContent = room ? 'Configurações da sala' : 'Nova sala'; elements.roomDialogTitle.textContent = room ? 'Editar sala' : 'Adicionar sala'; elements.deleteRoomButton.hidden = !room; elements.roomDialog.showModal();
 }
 
-function saveRoom(event) {
+async function saveRoom(event) {
   event.preventDefault(); const id = Number(elements.roomId.value); const name = elements.roomName.value.trim(); const capacity = Number(elements.roomCapacity.value);
   if (!name || !capacity || capacity < 1) return showFormError(elements.roomFormError, 'Informe um nome e uma capacidade válida.');
   if (state.rooms.some(room => room.id !== id && room.name.toLocaleLowerCase('pt-BR') === name.toLocaleLowerCase('pt-BR'))) return showFormError(elements.roomFormError, 'Já existe uma sala com este nome.');
+  const previousRooms = state.rooms.map(room => ({ ...room }));
   if (id) { const index = state.rooms.findIndex(room => room.id === id); state.rooms[index] = { ...state.rooms[index], name, capacity, status: elements.roomStatus.value }; }
   else { const nextId = Math.max(0, ...state.rooms.map(room => room.id)) + 1; state.rooms.push({ id: nextId, name, capacity, status: elements.roomStatus.value }); }
-  persistRooms(); elements.roomDialog.close(); fillRoomOptions(); renderAll(); showToast(id ? 'Sala atualizada com sucesso.' : 'Sala adicionada com sucesso.');
+  const submitButton = elements.roomForm.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    state.rooms = await saveRoomsToServer(state.rooms);
+    persistRooms(); elements.roomDialog.close(); fillRoomOptions(); renderAll();
+    showToast(id ? 'Sala atualizada para todos os alunos.' : 'Sala adicionada para todos os alunos.');
+  } catch (error) {
+    state.rooms = previousRooms;
+    renderAll();
+    showFormError(elements.roomFormError, error.message);
+  } finally {
+    submitButton.disabled = false;
+  }
 }
 
-function deleteCurrentRoom() {
-  const id = Number(elements.roomId.value); const room = roomById(id); if (!room || !window.confirm(`Remover ${room.name}? As reservas vinculadas também serão removidas.`)) return;
-  state.rooms = state.rooms.filter(item => item.id !== id); state.reservations = state.reservations.filter(item => item.roomId !== id); persistRooms(); persistReservations(); elements.roomDialog.close(); renderAll(); showToast('Sala e reservas vinculadas foram removidas.');
+async function deleteCurrentRoom() {
+  const id = Number(elements.roomId.value); const room = roomById(id); if (!room || !window.confirm(`Remover ${room.name}?`)) return;
+  const linkedReservations = state.reservations.filter(item => item.roomId === id);
+  if (linkedReservations.length) return showFormError(elements.roomFormError, 'Cancele primeiro as reservas vinculadas a esta sala.');
+  const previousRooms = state.rooms.map(item => ({ ...item }));
+  state.rooms = state.rooms.filter(item => item.id !== id);
+  try {
+    state.rooms = await saveRoomsToServer(state.rooms);
+    persistRooms(); elements.roomDialog.close(); renderAll(); showToast('Sala removida para todos os alunos.');
+  } catch (error) {
+    state.rooms = previousRooms;
+    renderAll();
+    showFormError(elements.roomFormError, error.message);
+  }
 }
 
 function renderUsers() {
@@ -540,7 +608,7 @@ function openUserDialog(user = null) {
   setTimeout(() => elements.userName.focus(), 50);
 }
 
-function saveUser(event) {
+async function saveUser(event) {
   event.preventDefault();
   const id = elements.userId.value;
   const name = elements.userName.value.trim();
@@ -550,50 +618,55 @@ function saveUser(event) {
 
   if (!name || !login || !ra) return showFormError(elements.userFormError, 'Preencha nome completo, login e RA.');
 
-  const existingUser = state.users.find(user => user.id === id);
   if (!id && !password) return showFormError(elements.userFormError, 'A senha é obrigatória para novos usuários.');
   if (password && password.length < 3) return showFormError(elements.userFormError, 'A senha deve ter no mínimo 3 caracteres.');
 
   if (state.users.some(user => user.id !== id && user.login.toLocaleLowerCase('pt-BR') === login.toLocaleLowerCase('pt-BR'))) return showFormError(elements.userFormError, 'Este login já está cadastrado.');
   if (state.users.some(user => user.id !== id && user.ra.toLocaleLowerCase('pt-BR') === ra.toLocaleLowerCase('pt-BR'))) return showFormError(elements.userFormError, 'Este RA já está cadastrado.');
 
-  const userPassword = password || (existingUser ? existingUser.password : '123456');
   const data = {
     id: id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
     name,
     login,
-    ra,
-    password: userPassword
+    ra
   };
+  if (password) data.password = password;
 
   const index = state.users.findIndex(user => user.id === id);
-  if (index >= 0) state.users[index] = data;
-  else state.users.push(data);
-
-  persistUsers();
-  elements.userDialog.close();
-  renderUsers();
-  showToast(index >= 0 ? 'Usuário atualizado com sucesso.' : 'Usuário cadastrado com sucesso.');
-
-  fetch('/api/users', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).catch(e => console.warn('Cloud sync error users:', e));
+  const submitButton = elements.userForm.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    const response = await fetch('/api/users', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível salvar o usuário online.');
+    if (index >= 0) state.users[index] = json.data;
+    else state.users.push(json.data);
+    persistUsers(); elements.userDialog.close(); renderUsers();
+    showToast(index >= 0 ? 'Usuário atualizado e sincronizado.' : 'Usuário cadastrado e sincronizado.');
+  } catch (error) {
+    showFormError(elements.userFormError, error.message);
+  } finally {
+    submitButton.disabled = false;
+  }
 }
 
-function deleteCurrentUser() {
+async function deleteCurrentUser() {
   const id = elements.userId.value;
   const user = state.users.find(item => item.id === id);
   if (!user || !window.confirm(`Remover o usuário ${user.name}?`)) return;
 
-  state.users = state.users.filter(item => item.id !== id);
-  persistUsers();
-  elements.userDialog.close();
-  renderUsers();
-  showToast('Usuário removido com sucesso.');
-
-  fetch(`/api/users?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(e => console.warn(e));
+  try {
+    const response = await fetch(`/api/users?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível remover o usuário online.');
+    state.users = state.users.filter(item => item.id !== id);
+    persistUsers(); elements.userDialog.close(); renderUsers();
+    showToast('Usuário removido e sincronizado.');
+  } catch (error) {
+    showFormError(elements.userFormError, error.message);
+  }
 }
 
 async function syncUsersFromServer() {
@@ -614,7 +687,7 @@ async function syncUsersFromServer() {
 
 async function syncReservationsFromServer() {
   try {
-    const res = await fetch('/api/reservations');
+    const res = await fetch('/api/reservations?admin=1', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       if (json.ok && Array.isArray(json.data)) {
@@ -653,44 +726,56 @@ function showAdmin() {
   switchView(state.activeView);
 }
 
-function login(event) {
+async function login(event) {
   event.preventDefault();
   const userInput = elements.loginUser.value.trim();
   const passInput = elements.loginPassword.value;
-
-  if (userInput.toLowerCase() === 'admin' && passInput === 'admin') {
+  const submitButton = elements.loginForm.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    const response = await fetch('/api/auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: userInput, password: passInput })
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível entrar.');
     sessionStorage.setItem(AUTH_KEY, 'true');
-    sessionStorage.setItem('current_user_name', 'Administrador');
-    sessionStorage.setItem('current_user_role', 'Acesso geral');
+    sessionStorage.setItem('current_user_name', json.user.name);
+    sessionStorage.setItem('current_user_role', json.user.ra ? `RA: ${json.user.ra}` : 'Acesso geral');
     elements.loginError.hidden = true;
     elements.loginForm.reset();
     showAdmin();
-    return;
+    await Promise.all([syncRoomsFromServer(), syncReservationsFromServer(), syncUsersFromServer()]);
+  } catch (error) {
+    showFormError(elements.loginError, error.message);
+  } finally {
+    submitButton.disabled = false;
   }
-
-  const matched = state.users.find(u =>
-    u.login.trim().toLowerCase() === userInput.toLowerCase() &&
-    String(u.password) === passInput
-  );
-
-  if (matched) {
-    sessionStorage.setItem(AUTH_KEY, 'true');
-    sessionStorage.setItem('current_user_name', matched.name);
-    sessionStorage.setItem('current_user_role', `RA: ${matched.ra}`);
-    elements.loginError.hidden = true;
-    elements.loginForm.reset();
-    showAdmin();
-    return;
-  }
-
-  showFormError(elements.loginError, 'Usuário ou senha incorretos.');
 }
 
-function logout() {
+async function logout() {
+  await fetch('/api/auth', { method: 'DELETE' }).catch(() => {});
   sessionStorage.removeItem(AUTH_KEY);
   sessionStorage.removeItem('current_user_name');
   sessionStorage.removeItem('current_user_role');
   showAccess();
+}
+
+async function restoreSession() {
+  try {
+    const response = await fetch('/api/auth', { cache: 'no-store' });
+    const json = await response.json();
+    if (!response.ok || !json.authenticated) throw new Error('Sessão inválida');
+    sessionStorage.setItem(AUTH_KEY, 'true');
+    sessionStorage.setItem('current_user_name', json.user.name);
+    sessionStorage.setItem('current_user_role', json.user.ra ? `RA: ${json.user.ra}` : 'Acesso geral');
+    showAdmin();
+    return true;
+  } catch {
+    sessionStorage.removeItem(AUTH_KEY);
+    showAccess();
+    return false;
+  }
 }
 
 function switchView(view) {
@@ -810,7 +895,22 @@ function bindEvents() {
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && elements.scheduleDrawer.classList.contains('open')) closeDrawer(); });
 }
 
-function init() {
+function configureStudentAccess() {
+  const portalUrl = new URL('/aluno', window.location.origin).href;
+  if (elements.studentPortalUrl) elements.studentPortalUrl.value = portalUrl;
+  elements.copyStudentPortal?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(portalUrl);
+      showToast('Link do Portal do Aluno copiado.');
+    } catch {
+      elements.studentPortalUrl?.select();
+      document.execCommand('copy');
+      showToast('Link do Portal do Aluno copiado.');
+    }
+  });
+}
+
+async function init() {
   elements.todayLabel.textContent = formatDate(toDateInput(new Date()));
   elements.selectedDate.value = state.selectedDate;
   fillRoomOptions();
@@ -818,10 +918,10 @@ function init() {
   renderAll();
   setRoomLayout('grid');
   updateCurrentUserDisplay();
-  if (sessionStorage.getItem(AUTH_KEY) === 'true') showAdmin();
-  else showAccess();
-  syncReservationsFromServer();
-  syncUsersFromServer();
+  configureStudentAccess();
+  const authenticated = await restoreSession();
+  if (authenticated) await Promise.all([syncRoomsFromServer(), syncReservationsFromServer(), syncUsersFromServer()]);
+  else await syncRoomsFromServer();
 }
 
 init();

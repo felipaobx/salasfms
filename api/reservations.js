@@ -1,6 +1,7 @@
 const { put, list } = require('@vercel/blob');
 const fs = require('fs');
 const path = require('path');
+const { readSession, requireAuth } = require('./_auth');
 
 const BLOB_PATH = 'database/reservations.json';
 const LOCAL_PATH = path.join(process.cwd(), 'data', 'reservations.json');
@@ -69,9 +70,7 @@ function overlaps(startA, endA, startB, endB) {
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'no-store');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -81,7 +80,12 @@ module.exports = async (req, res) => {
 
   if (method === 'GET') {
     const data = await readFromStorage();
-    return res.status(200).json({ ok: true, data });
+    if (req.query?.admin === '1') {
+      if (!requireAuth(req, res)) return;
+      return res.status(200).json({ ok: true, data });
+    }
+    const publicData = data.map(({ id, roomId, date, start, end, origin }) => ({ id, roomId, date, start, end, origin }));
+    return res.status(200).json({ ok: true, data: publicData });
   }
 
   if (method === 'POST') {
@@ -90,7 +94,9 @@ module.exports = async (req, res) => {
       try { body = JSON.parse(body); } catch { body = {}; }
     }
 
-    const { roomId, date, start, end, name, ra, email, origin = 'student' } = body || {};
+    const session = readSession(req);
+    const { roomId, date, start, end, name, ra, email } = body || {};
+    const origin = session && body?.origin === 'admin' ? 'admin' : 'student';
 
     if (!roomId || !date || !start || !end || !name || !ra) {
       return res.status(400).json({ ok: false, error: 'Campos obrigatórios não preenchidos.' });
@@ -103,6 +109,14 @@ module.exports = async (req, res) => {
     }
 
     const reservations = await readFromStorage();
+
+    const requestedHours = (endMin - startMin) / 60;
+    const usedHours = reservations
+      .filter(item => item.roomId === Number(roomId) && item.date === date && String(item.ra || '').trim().toLocaleLowerCase('pt-BR') === String(ra).trim().toLocaleLowerCase('pt-BR'))
+      .reduce((total, item) => total + Math.max(0, (timeInMinutes(item.end) - timeInMinutes(item.start)) / 60), 0);
+    if (origin === 'student' && usedHours + requestedHours > 2) {
+      return res.status(409).json({ ok: false, error: 'Limite diário de 2 horas atingido para esta sala.' });
+    }
 
     const conflict = reservations.find(item =>
       item.roomId === Number(roomId) &&
@@ -128,12 +142,13 @@ module.exports = async (req, res) => {
     };
 
     reservations.push(newReservation);
-    await writeToStorage(reservations);
+    if (!await writeToStorage(reservations)) return res.status(500).json({ ok: false, error: 'Não foi possível salvar a reserva no banco online.' });
 
     return res.status(201).json({ ok: true, data: newReservation });
   }
 
   if (method === 'DELETE') {
+    if (!requireAuth(req, res)) return;
     const id = req.query?.id || (typeof req.body === 'object' ? req.body.id : null);
     if (!id) {
       return res.status(400).json({ ok: false, error: 'ID da reserva não informado.' });
@@ -147,11 +162,12 @@ module.exports = async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Reserva não encontrada.' });
     }
 
-    await writeToStorage(reservations);
+    if (!await writeToStorage(reservations)) return res.status(500).json({ ok: false, error: 'Não foi possível cancelar a reserva no banco online.' });
     return res.status(200).json({ ok: true, message: 'Reserva cancelada com sucesso.' });
   }
 
   if (method === 'PUT') {
+    if (!requireAuth(req, res)) return;
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch { body = {}; }
@@ -189,7 +205,7 @@ module.exports = async (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
-    await writeToStorage(reservations);
+    if (!await writeToStorage(reservations)) return res.status(500).json({ ok: false, error: 'Não foi possível atualizar a reserva no banco online.' });
     return res.status(200).json({ ok: true, data: reservations[index] });
   }
 

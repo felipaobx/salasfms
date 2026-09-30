@@ -1,6 +1,8 @@
 const { put, list } = require('@vercel/blob');
 const fs = require('fs');
 const path = require('path');
+const { requireAuth } = require('./_auth');
+const { hashPassword } = require('./_password');
 
 const BLOB_PATH = 'database/users.json';
 const LOCAL_PATH = path.join(process.cwd(), 'data', 'users.json');
@@ -60,31 +62,24 @@ async function writeUsers(data) {
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'no-store');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   const method = req.method;
+  if (!requireAuth(req, res)) return;
 
   if (method === 'GET') {
     const users = await readUsers();
-    return res.status(200).json({ ok: true, data: users });
+    return res.status(200).json({ ok: true, data: users.map(({ password, ...user }) => user) });
   }
 
   if (method === 'POST') {
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch { body = {}; }
-    }
-
-    // Support either full list sync or single user
-    if (Array.isArray(body)) {
-      await writeUsers(body);
-      return res.status(200).json({ ok: true, data: body });
     }
 
     const { id, name, login, ra, password } = body || {};
@@ -100,15 +95,18 @@ module.exports = async (req, res) => {
       name: String(name).trim(),
       login: String(login).trim(),
       ra: String(ra || '').trim(),
-      password: String(password || (index >= 0 ? users[index].password : '123456')),
+      password: password ? hashPassword(String(password)) : (index >= 0 ? users[index].password : ''),
       updatedAt: new Date().toISOString()
     };
+
+    if (!userData.password) return res.status(400).json({ ok: false, error: 'A senha é obrigatória para novos usuários.' });
 
     if (index >= 0) users[index] = userData;
     else users.push(userData);
 
-    await writeUsers(users);
-    return res.status(200).json({ ok: true, data: userData });
+    if (!await writeUsers(users)) return res.status(500).json({ ok: false, error: 'Não foi possível salvar o usuário no banco online.' });
+    const { password: omittedPassword, ...safeUser } = userData;
+    return res.status(200).json({ ok: true, data: safeUser });
   }
 
   if (method === 'DELETE') {
@@ -117,7 +115,7 @@ module.exports = async (req, res) => {
 
     let users = await readUsers();
     users = users.filter(u => String(u.id) !== String(id));
-    await writeUsers(users);
+    if (!await writeUsers(users)) return res.status(500).json({ ok: false, error: 'Não foi possível remover o usuário do banco online.' });
 
     return res.status(200).json({ ok: true, message: 'Usuário removido.' });
   }

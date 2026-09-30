@@ -142,6 +142,23 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .status-summary > div + div { border-left: 1px solid var(--line); padding-left: 1.5rem; }
 .status-summary strong { display: block; font-size: 1.25rem; line-height: 1.05; }
 .status-summary small { display: block; margin-top: .22rem; color: var(--muted); font-size: .7rem; }
+
+.student-access-panel { margin: 1.1rem 0 1.35rem; padding: 1.35rem; display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 1.35rem; align-items: center; border: 1px solid #cfe0ee; border-radius: var(--radius); background: linear-gradient(135deg, #f7fbff 0%, #eef7ff 100%); box-shadow: var(--shadow); }
+.student-access-copy h2 { margin: .25rem 0 .4rem; font-size: 1.18rem; color: var(--text); }
+.student-access-copy > p { max-width: 650px; margin: 0 0 1rem; color: var(--muted); line-height: 1.55; }
+.student-portal-address { display: flex; gap: .55rem; max-width: 680px; }
+.student-portal-address input { min-width: 0; flex: 1; padding: .72rem .85rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: #334155; font: inherit; }
+.student-access-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .75rem; }
+.student-access-actions a { text-decoration: none; }
+.student-qr-card { justify-self: end; padding: .75rem; display: grid; justify-items: center; gap: .35rem; border: 1px solid #dbe7f0; border-radius: 14px; background: #fff; }
+.student-qr-card img { display: block; width: 150px; height: 150px; }
+.student-qr-card small { color: var(--muted); font-size: .68rem; }
+
+@media (max-width: 760px) {
+  .student-access-panel { grid-template-columns: 1fr; }
+  .student-qr-card { justify-self: center; }
+  .student-portal-address { align-items: stretch; flex-direction: column; }
+}
 .summary-icon { width: 2.55rem; height: 2.55rem; display: grid; place-items: center; border-radius: .72rem; }
 .summary-icon.available { color: var(--green); background: var(--green-soft); }
 .summary-icon.occupied { color: var(--red); background: var(--red-soft); }
